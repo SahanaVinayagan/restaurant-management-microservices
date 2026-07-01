@@ -1,0 +1,58 @@
+server:
+  port: 8080
+
+
+spring:
+  application:
+    name: api-gateway
+
+
+  cloud:
+    gateway:
+      routes:
+
+        # Restaurant Service
+        - id: restaurant-service
+          uri: http://restaurant-service:8081
+          predicates:
+            - Path=/restaurants/**
+
+
+        # Order Service
+        - id: order-service
+          uri: http://order-service:8082
+          predicates:
+            - Path=/orders/**
+
+
+        # Payment Service
+        - id: payment-service
+          uri: http://payment-service:8083
+          predicates:
+            - Path=/payments/**
+
+
+        # Audit Service
+        - id: audit-service
+          uri: http://audit-service:8084
+          predicates:
+            - Path=/logs/**
+
+
+
+# Eureka Client
+eureka:
+  client:
+    register-with-eureka: true
+    fetch-registry: true
+    service-url:
+      defaultZone: http://eureka-server:8761/eureka/
+
+
+
+# Actuator
+management:
+  endpoints:
+    web:
+      exposure:
+        include: "*"

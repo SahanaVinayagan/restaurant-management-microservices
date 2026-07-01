@@ -1,0 +1,144 @@
+services:
+
+  mysql:
+    image: mysql:8.0
+    container_name: rms-mysql
+
+    environment:
+      MYSQL_ROOT_PASSWORD: root
+
+    ports:
+      - "3307:3306"
+
+    volumes:
+      - mysql-data:/var/lib/mysql
+      - ./mysql-init:/docker-entrypoint-initdb.d:ro
+
+    healthcheck:
+      test: ["CMD-SHELL", "mysqladmin ping -h localhost -proot"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+
+
+  eureka-server:
+    build: ./eureka-server
+    container_name: eureka-server
+
+    ports:
+      - "8761:8761"
+
+
+
+  api-gateway:
+    build: ./api-gateway
+    container_name: api-gateway
+
+    ports:
+      - "8085:8080"
+
+    depends_on:
+      - eureka-server
+
+
+
+  restaurant-service:
+    build: ./restaurant-service
+    container_name: restaurant-service
+
+    ports:
+      - "8081:8081"
+
+    depends_on:
+      mysql:
+        condition: service_healthy
+
+      eureka-server:
+        condition: service_started
+
+    environment:
+      SPRING_DATASOURCE_URL: jdbc:mysql://mysql:3306/restaurantdb
+      SPRING_DATASOURCE_USERNAME: root
+      SPRING_DATASOURCE_PASSWORD: root
+
+      EUREKA_CLIENT_SERVICEURL_DEFAULTZONE: http://eureka-server:8761/eureka/
+
+
+
+  order-service:
+    build: ./order-service
+    container_name: order-service
+
+    ports:
+      - "8082:8082"
+
+    depends_on:
+      mysql:
+        condition: service_healthy
+
+      eureka-server:
+        condition: service_started
+
+    environment:
+      SPRING_DATASOURCE_URL: jdbc:mysql://mysql:3306/orderdb
+      SPRING_DATASOURCE_USERNAME: root
+      SPRING_DATASOURCE_PASSWORD: root
+
+      EUREKA_CLIENT_SERVICEURL_DEFAULTZONE: http://eureka-server:8761/eureka/
+
+
+
+  payment-service:
+    build: ./payment-service
+    container_name: payment-service
+
+    ports:
+      - "8083:8083"
+
+    depends_on:
+      mysql:
+        condition: service_healthy
+
+      eureka-server:
+        condition: service_started
+
+    environment:
+      SPRING_DATASOURCE_URL: jdbc:mysql://mysql:3306/paymentdb
+      SPRING_DATASOURCE_USERNAME: root
+      SPRING_DATASOURCE_PASSWORD: root
+
+      EUREKA_CLIENT_SERVICEURL_DEFAULTZONE: http://eureka-server:8761/eureka/
+
+
+
+  audit-service:
+    build:
+      context: ./audit-service
+
+    container_name: audit-service
+
+    ports:
+      - "8084:8084"
+
+    depends_on:
+      mysql:
+        condition: service_healthy
+
+      eureka-server:
+        condition: service_started
+
+
+    environment:
+
+      SPRING_DATASOURCE_URL: jdbc:mysql://mysql:3306/auditdb
+      SPRING_DATASOURCE_USERNAME: root
+      SPRING_DATASOURCE_PASSWORD: root
+
+      EUREKA_CLIENT_SERVICEURL_DEFAULTZONE: http://eureka-server:8761/eureka/
+
+
+
+volumes:
+
+  mysql-data:

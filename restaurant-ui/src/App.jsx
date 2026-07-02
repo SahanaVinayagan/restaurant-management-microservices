@@ -1,5 +1,9 @@
 ﻿import { useEffect, useState } from "react";
 import "./App.css";
+import { SummaryCards } from "./components/SummaryCards";
+import { FormCard } from "./components/FormCard";
+import { TableContainer } from "./components/TableContainer";
+import { formatTimestamp, getActionColor } from "./utils/helpers";
 
 const endpoints = {
   restaurants: "/restaurants",
@@ -8,36 +12,7 @@ const endpoints = {
   logs: "/logs",
 };
 
-const formatTimestamp = (timestamp) => {
-  if (!timestamp) return "";
-  const value = String(timestamp).trim();
-  const bareIso = /^([0-9]{4})-([0-9]{2})-([0-9]{2})T([0-9]{2}):([0-9]{2}):([0-9]{2})(?:\.[0-9]+)?$/;
-  const offsetIso = /^([0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}(?:\.[0-9]+)?)(Z|[+-][0-9]{2}:[0-9]{2})$/;
-  let date;
-
-  if (offsetIso.test(value)) {
-    date = new Date(value);
-  } else {
-    const match = bareIso.exec(value);
-    date = match
-      ? new Date(Date.UTC(
-          Number(match[1]),
-          Number(match[2]) - 1,
-          Number(match[3]),
-          Number(match[4]),
-          Number(match[5]),
-          Number(match[6])
-        ))
-      : new Date(value);
-  }
-
-  if (Number.isNaN(date.getTime())) return value;
-  const pad = (v) => String(v).padStart(2, "0");
-  return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())} ${pad(date.getHours())}:${pad(date.getMinutes())}:${pad(date.getSeconds())}`;
-};
-
 function App() {
-  const [activeTab, setActiveTab] = useState("restaurants");
   const [restaurants, setRestaurants] = useState([]);
   const [orders, setOrders] = useState([]);
   const [payments, setPayments] = useState([]);
@@ -45,28 +20,7 @@ function App() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const [theme, setTheme] = useState("light");
-
-  const [restaurantForm, setRestaurantForm] = useState({
-    name: "",
-    address: "",
-    cuisine: "",
-  });
-
-  const [orderForm, setOrderForm] = useState({
-    restaurantId: "",
-    customerName: "",
-    amount: "",
-  });
-
-  const [paymentForm, setPaymentForm] = useState({
-    orderId: "",
-    amount: "",
-    status: "PAID",
-  });
-
-  useEffect(() => {
-    loadData();
-  }, [activeTab]);
+  const [activeTab, setActiveTab] = useState("restaurants");
 
   useEffect(() => {
     const storedTheme = window.localStorage.getItem("tabletrack-theme");
@@ -76,16 +30,12 @@ function App() {
   }, []);
 
   useEffect(() => {
-    document.documentElement.dataset.theme = theme;
     document.documentElement.setAttribute("data-theme", theme);
     window.localStorage.setItem("tabletrack-theme", theme);
   }, [theme]);
 
   useEffect(() => {
-    loadRestaurants();
-    loadOrders();
-    loadPayments();
-    loadLogs();
+    loadAllData();
   }, []);
 
   const callApi = async (path, options = {}) => {
@@ -104,9 +54,7 @@ function App() {
       }
 
       const text = await response.text();
-      if (!text) {
-        return null;
-      }
+      if (!text) return null;
 
       try {
         return JSON.parse(text);
@@ -121,66 +69,36 @@ function App() {
     }
   };
 
-  const loadRestaurants = async () => {
-    const result = await callApi(endpoints.restaurants);
-    if (result) setRestaurants(result);
+  const loadAllData = async () => {
+    const [restaurantData, orderData, paymentData, logData] = await Promise.all([
+      callApi(endpoints.restaurants),
+      callApi(endpoints.orders),
+      callApi(endpoints.payments),
+      callApi(endpoints.logs),
+    ]);
+
+    if (restaurantData) setRestaurants(Array.isArray(restaurantData) ? restaurantData : []);
+    if (orderData) setOrders(Array.isArray(orderData) ? orderData : []);
+    if (paymentData) setPayments(Array.isArray(paymentData) ? paymentData : []);
+    if (logData) setLogs(Array.isArray(logData) ? logData : []);
   };
 
-  const loadOrders = async () => {
-    const result = await callApi(endpoints.orders);
-    if (result) setOrders(result);
-  };
-
-  const loadPayments = async () => {
-    const result = await callApi(endpoints.payments);
-    if (result) setPayments(result);
-  };
-
-  const loadLogs = async () => {
-  const result = await callApi(endpoints.logs);
-
-  console.log("Audit Logs Response:", result);
-
-  if (Array.isArray(result)) {
-    setLogs(result);
-  } else {
-    setLogs([]);
-  }
-};
-
-  const loadData = () => {
-
-  if(activeTab === "restaurants")
-    return loadRestaurants();
-
-  if(activeTab === "orders")
-    return loadOrders();
-
-  if(activeTab === "payments")
-    return loadPayments();
-
-  if(activeTab === "logs")
-    return loadLogs();
-
-};
-
-  const submitRestaurant = async () => {
-    if (!restaurantForm.name || !restaurantForm.address || !restaurantForm.cuisine) {
+  const submitRestaurant = async (formData) => {
+    if (!formData.name || !formData.address || !formData.cuisine) {
       setError("Please fill in all restaurant fields.");
       return;
     }
 
     await callApi(endpoints.restaurants, {
       method: "POST",
-      body: JSON.stringify(restaurantForm),
+      body: JSON.stringify(formData),
     });
 
-    setRestaurantForm({ name: "", address: "", cuisine: "" });
-    loadRestaurants();
+    loadAllData();
   };
 
-  const submitOrder = async () => {
-    if (!orderForm.restaurantId || !orderForm.customerName || !orderForm.amount) {
+  const submitOrder = async (formData) => {
+    if (!formData.restaurantId || !formData.customerName || !formData.amount) {
       setError("Please fill in all order fields.");
       return;
     }
@@ -188,18 +106,17 @@ function App() {
     await callApi(endpoints.orders, {
       method: "POST",
       body: JSON.stringify({
-        restaurantId: Number(orderForm.restaurantId),
-        customerName: orderForm.customerName,
-        amount: Number(orderForm.amount),
+        restaurantId: Number(formData.restaurantId),
+        customerName: formData.customerName,
+        amount: Number(formData.amount),
       }),
     });
 
-    setOrderForm({ restaurantId: "", customerName: "", amount: "" });
-    loadOrders();
+    loadAllData();
   };
 
-  const submitPayment = async () => {
-    if (!paymentForm.orderId || !paymentForm.amount || !paymentForm.status) {
+  const submitPayment = async (formData) => {
+    if (!formData.orderId || !formData.amount || !formData.status) {
       setError("Please fill in all payment fields.");
       return;
     }
@@ -207,385 +124,274 @@ function App() {
     await callApi(endpoints.payments, {
       method: "POST",
       body: JSON.stringify({
-        orderId: Number(paymentForm.orderId),
-        amount: Number(paymentForm.amount),
-        status: paymentForm.status,
+        orderId: Number(formData.orderId),
+        amount: Number(formData.amount),
+        status: formData.status,
       }),
     });
 
-    setPaymentForm({ orderId: "", amount: "", status: "PAID" });
-    loadPayments();
+    loadAllData();
   };
 
   const deleteRestaurant = async (id) => {
     await callApi(`${endpoints.restaurants}/${id}`, { method: "DELETE" });
-    loadRestaurants();
+    loadAllData();
   };
 
   const deleteOrder = async (id) => {
     await callApi(`${endpoints.orders}/${id}`, { method: "DELETE" });
-    loadOrders();
+    loadAllData();
   };
 
-  const totalRevenue = payments.reduce((sum, payment) => sum + Number(payment.amount || 0), 0);
+  // Reverse data to show newest first
+  const reversedRestaurants = [...restaurants].reverse();
+  const reversedOrders = [...orders].reverse();
+  const reversedPayments = [...payments].reverse();
+  const reversedLogs = [...logs].reverse();
 
   return (
-    <div className="container">
-      <header className="header">
-        <div>
+    <div className="app">
+      <header className="app-header">
+        <div className="header-content">
           <h1 className="app-title">TableTrack</h1>
-          <p className="header-subtitle">Manage restaurants, orders, and payments in one dashboard</p>
+          <p className="app-subtitle">Restaurant Management Dashboard</p>
         </div>
-        <button type="button" className="secondary-button theme-toggle" onClick={() => setTheme((current) => (current === "light" ? "dark" : "light"))}>
-          {theme === "light" ? "Dark mode" : "Light mode"}
+        <button
+          type="button"
+          className="theme-toggle"
+          onClick={() => setTheme((current) => (current === "light" ? "dark" : "light"))}
+          title="Toggle theme"
+        >
+          {theme === "light" ? "Dark" : "Light"}
         </button>
       </header>
 
-      <div className="tabs">
-        {[
-          { id: "restaurants", label: "Restaurants" },
-          { id: "orders", label: "Orders" },
-          { id: "payments", label: "Payments" },
-          { id: "logs", label: "Audit Logs" },
-        ].map((tab) => (
-          <button
-            key={tab.id}
-            className={activeTab === tab.id ? "tab active" : "tab"}
-            onClick={() => setActiveTab(tab.id)}
-            type="button"
-          >
-            {tab.label}
-          </button>
-        ))}
+      <div className="container">
+        <SummaryCards restaurants={restaurants} orders={orders} payments={payments} />
+
+        {error && (
+          <div className="notification error">
+            <strong>Error</strong>
+            <p>{error}</p>
+            <button className="notification-close" onClick={() => setError("")}>×</button>
+          </div>
+        )}
+
+        <nav className="tabs">
+          {[
+            { id: "restaurants", label: "Restaurants" },
+            { id: "orders", label: "Orders" },
+            { id: "payments", label: "Payments" },
+            { id: "logs", label: "Audit Logs" },
+          ].map((tab) => (
+            <button
+              key={tab.id}
+              className={`tab ${activeTab === tab.id ? "active" : ""}`}
+              onClick={() => setActiveTab(tab.id)}
+              type="button"
+            >
+              {tab.label}
+            </button>
+          ))}
+        </nav>
+
+        {/* Restaurants Section */}
+        {activeTab === "restaurants" && (
+          <div className="section">
+            <div className="section-layout">
+              <FormCard
+                title="Add New Restaurant"
+                onSubmit={submitRestaurant}
+                fields={[
+                  { name: "name", label: "Restaurant Name", placeholder: "Enter name", required: true },
+                  { name: "address", label: "Address", placeholder: "Enter address", required: true },
+                  { name: "cuisine", label: "Cuisine Type", placeholder: "Enter cuisine", required: true },
+                ]}
+                isLoading={loading}
+              />
+
+              <div className="section-content">
+                <div className="content-header">
+                  <h2>Restaurants</h2>
+                  <button className="btn-refresh" onClick={loadAllData} title="Refresh">
+                    Refresh
+                  </button>
+                </div>
+
+                <TableContainer
+                  title="Restaurants List"
+                  columns={[
+                    { key: "id", label: "ID" },
+                    { key: "name", label: "Name" },
+                    { key: "address", label: "Address" },
+                    { key: "cuisine", label: "Cuisine" },
+                  ]}
+                  data={reversedRestaurants}
+                  searchFields={["name", "address", "cuisine"]}
+                  onDelete={deleteRestaurant}
+                  isLoading={loading}
+                />
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Orders Section */}
+        {activeTab === "orders" && (
+          <div className="section">
+            <div className="section-layout">
+              <FormCard
+                title="Add New Order"
+                onSubmit={submitOrder}
+                fields={[
+                  {
+                    name: "restaurantId",
+                    label: "Restaurant",
+                    type: "select",
+                    required: true,
+                    options: restaurants.map((r) => ({ value: r.id, label: r.name })),
+                  },
+                  { name: "customerName", label: "Customer Name", placeholder: "Enter name", required: true },
+                  { name: "amount", label: "Amount", type: "number", placeholder: "0.00", required: true },
+                ]}
+                isLoading={loading}
+              />
+
+              <div className="section-content">
+                <div className="content-header">
+                  <h2>Orders</h2>
+                  <button className="btn-refresh" onClick={loadAllData} title="Refresh">
+                    Refresh
+                  </button>
+                </div>
+
+                <TableContainer
+                  title="Orders List"
+                  columns={[
+                    { key: "id", label: "Order ID" },
+                    { key: "customerName", label: "Customer" },
+                    { key: "restaurantId", label: "Restaurant ID" },
+                    {
+                      key: "amount",
+                      label: "Amount",
+                      render: (val) => `₹${Number(val).toFixed(2)}`,
+                    },
+                  ]}
+                  data={reversedOrders}
+                  searchFields={["customerName"]}
+                  onDelete={deleteOrder}
+                  isLoading={loading}
+                />
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Payments Section */}
+        {activeTab === "payments" && (
+          <div className="section">
+            <div className="section-layout">
+              <FormCard
+                title="Add Payment"
+                onSubmit={submitPayment}
+                fields={[
+                  {
+                    name: "orderId",
+                    label: "Order",
+                    type: "select",
+                    required: true,
+                    options: orders.map((o) => ({ value: o.id, label: `#${o.id} - ${o.customerName}` })),
+                  },
+                  { name: "amount", label: "Amount", type: "number", placeholder: "0.00", required: true },
+                  {
+                    name: "status",
+                    label: "Status",
+                    type: "select",
+                    required: true,
+                    value: "PAID",
+                    options: [
+                      { value: "PAID", label: "Paid" },
+                      { value: "PENDING", label: "Pending" },
+                      { value: "FAILED", label: "Failed" },
+                    ],
+                  },
+                ]}
+                isLoading={loading}
+              />
+
+              <div className="section-content">
+                <div className="content-header">
+                  <h2>Payments</h2>
+                  <button className="btn-refresh" onClick={loadAllData} title="Refresh">
+                    Refresh
+                  </button>
+                </div>
+
+                <TableContainer
+                  title="Payments List"
+                  columns={[
+                    { key: "id", label: "Payment ID" },
+                    { key: "orderId", label: "Order ID" },
+                    {
+                      key: "amount",
+                      label: "Amount",
+                      render: (val) => `₹${Number(val).toFixed(2)}`,
+                    },
+                    {
+                      key: "status",
+                      label: "Status",
+                      render: (val) => (
+                        <span className={`badge status-${String(val).toLowerCase()}`}>{val}</span>
+                      ),
+                    },
+                  ]}
+                  data={reversedPayments}
+                  searchFields={["status"]}
+                  isLoading={loading}
+                />
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Audit Logs Section */}
+        {activeTab === "logs" && (
+          <div className="section">
+            <div className="section-content full-width">
+              <div className="content-header">
+                <h2>Audit Logs</h2>
+                <button className="btn-refresh" onClick={loadAllData} title="Refresh">
+                  Refresh
+                </button>
+              </div>
+
+              <TableContainer
+                title="Audit Logs"
+                columns={[
+                  { key: "id", label: "ID" },
+                  { key: "serviceName", label: "Service" },
+                  {
+                    key: "action",
+                    label: "Action",
+                    render: (val) => <span className={`badge ${getActionColor(val)}`}>{val}</span>,
+                  },
+                  { key: "entityName", label: "Entity" },
+                  { key: "username", label: "User" },
+                  { key: "description", label: "Description" },
+                  {
+                    key: "timestamp",
+                    label: "Timestamp",
+                    render: (val) => formatTimestamp(val),
+                  },
+                ]}
+                data={reversedLogs}
+                searchFields={["serviceName", "action", "entityName", "username"]}
+                isLoading={loading}
+              />
+            </div>
+          </div>
+        )}
       </div>
-
-      <div className="dashboard-grid">
-        <article className="metric-card">
-          <span className="metric-title">Restaurants</span>
-          <strong>{restaurants.length}</strong>
-        </article>
-        <article className="metric-card">
-          <span className="metric-title">Orders</span>
-          <strong>{orders.length}</strong>
-        </article>
-        <article className="metric-card">
-          <span className="metric-title">Total payments</span>
-          <strong>${totalRevenue.toFixed(2)}</strong>
-        </article>
-      </div>
-
-      {error && (
-        <div className="notification error">
-          <strong>Error</strong>
-          <p>{error}</p>
-        </div>
-      )}
-
-      {loading && <div className="notification info">Loading…</div>}
-
-      {activeTab === "restaurants" && (
-        <section className="panel">
-          <div className="panel-header">
-            <div>
-              <h2>Restaurants</h2>
-              <p>View and add restaurants for your delivery ecosystem.</p>
-            </div>
-            <button type="button" className="secondary-button" onClick={loadRestaurants}>
-              Refresh
-            </button>
-          </div>
-
-          <div className="panel-grid">
-            <div className="form-card">
-              <h3>Add new restaurant</h3>
-              <div className="form-grid">
-                <label>
-                  Name
-                  <input
-                    value={restaurantForm.name}
-                    onChange={(e) => setRestaurantForm({ ...restaurantForm, name: e.target.value })}
-                    placeholder="Restaurant name"
-                  />
-                </label>
-                <label>
-                  Address
-                  <input
-                    value={restaurantForm.address}
-                    onChange={(e) => setRestaurantForm({ ...restaurantForm, address: e.target.value })}
-                    placeholder="Address"
-                  />
-                </label>
-                <label>
-                  Cuisine
-                  <input
-                    value={restaurantForm.cuisine}
-                    onChange={(e) => setRestaurantForm({ ...restaurantForm, cuisine: e.target.value })}
-                    placeholder="Cuisine"
-                  />
-                </label>
-              </div>
-              <button type="button" onClick={submitRestaurant}>
-                Create restaurant
-              </button>
-            </div>
-
-            <div className="card-grid">
-              {restaurants.length === 0 ? (
-                <div className="empty-state">No restaurants yet.</div>
-              ) : (
-                restaurants.map((restaurant) => (
-                  <article className="card" key={restaurant.id}>
-                    <h3>{restaurant.name}</h3>
-                    <p>{restaurant.address}</p>
-                    <p className="tag">{restaurant.cuisine}</p>
-                    <button className="danger-button" type="button" onClick={() => deleteRestaurant(restaurant.id)}>
-                      Delete restaurant
-                    </button>
-                  </article>
-                ))
-              )}
-            </div>
-          </div>
-        </section>
-      )}
-
-      {activeTab === "orders" && (
-        <section className="panel">
-          <div className="panel-header">
-            <div>
-              <h2>Orders</h2>
-              <p>Create orders and track customer purchases.</p>
-            </div>
-            <button type="button" className="secondary-button" onClick={loadOrders}>
-              Refresh
-            </button>
-          </div>
-
-          <div className="panel-grid">
-            <div className="form-card">
-              <h3>Add new order</h3>
-              <div className="form-grid">
-                <label>
-                  Restaurant
-                  <select
-                    value={orderForm.restaurantId}
-                    onChange={(e) => setOrderForm({ ...orderForm, restaurantId: e.target.value })}
-                  >
-                    <option value="">Select restaurant</option>
-                    {restaurants.map((restaurant) => (
-                      <option key={restaurant.id} value={restaurant.id}>
-                        {restaurant.name}
-                      </option>
-                    ))}
-                  </select>
-                </label>
-                <label>
-                  Customer name
-                  <input
-                    value={orderForm.customerName}
-                    onChange={(e) => setOrderForm({ ...orderForm, customerName: e.target.value })}
-                    placeholder="Customer name"
-                  />
-                </label>
-                <label>
-                  Amount
-                  <input
-                    type="number"
-                    value={orderForm.amount}
-                    onChange={(e) => setOrderForm({ ...orderForm, amount: e.target.value })}
-                    placeholder="Order total"
-                  />
-                </label>
-              </div>
-              <button type="button" onClick={submitOrder}>
-                Place order
-              </button>
-            </div>
-
-            <div className="card-grid">
-              {orders.length === 0 ? (
-                <div className="empty-state">No orders yet.</div>
-              ) : (
-                orders.map((order) => (
-                  <article className="card" key={order.id}>
-                    <h3>Order #{order.id}</h3>
-                    <p>Customer: {order.customerName}</p>
-                    <p>Restaurant ID: {order.restaurantId}</p>
-                    <p>Amount: ${Number(order.amount).toFixed(2)}</p>
-                    <button className="danger-button" type="button" onClick={() => deleteOrder(order.id)}>
-                      Delete order
-                    </button>
-                  </article>
-                ))
-              )}
-            </div>
-          </div>
-        </section>
-      )}
-
-      {activeTab === "payments" && (
-        <section className="panel">
-          <div className="panel-header">
-            <div>
-              <h2>Payments</h2>
-              <p>Record payments for completed orders.</p>
-            </div>
-            <button type="button" className="secondary-button" onClick={loadPayments}>
-              Refresh
-            </button>
-          </div>
-
-          <div className="panel-grid">
-            <div className="form-card">
-              <h3>Add payment</h3>
-              <div className="form-grid">
-                <label>
-                  Order
-                  <select
-                    value={paymentForm.orderId}
-                    onChange={(e) => setPaymentForm({ ...paymentForm, orderId: e.target.value })}
-                  >
-                    <option value="">Select order</option>
-                    {orders.map((order) => (
-                      <option key={order.id} value={order.id}>
-                        #{order.id} - {order.customerName}
-                      </option>
-                    ))}
-                  </select>
-                </label>
-                <label>
-                  Amount
-                  <input
-                    type="number"
-                    value={paymentForm.amount}
-                    onChange={(e) => setPaymentForm({ ...paymentForm, amount: e.target.value })}
-                    placeholder="Payment amount"
-                  />
-                </label>
-                <label>
-                  Status
-                  <select value={paymentForm.status} onChange={(e) => setPaymentForm({ ...paymentForm, status: e.target.value })}>
-                    <option value="PAID">PAID</option>
-                    <option value="PENDING">PENDING</option>
-                    <option value="FAILED">FAILED</option>
-                  </select>
-                </label>
-              </div>
-              <button type="button" onClick={submitPayment}>
-                Record payment
-              </button>
-            </div>
-
-            <div className="card-grid">
-              {payments.length === 0 ? (
-                <div className="empty-state">No payments yet.</div>
-              ) : (
-                payments.map((payment) => (
-                  <article className="card" key={payment.id}>
-                    <h3>Payment #{payment.id}</h3>
-                    <p>Order ID: {payment.orderId}</p>
-                    <p>Amount: ${Number(payment.amount).toFixed(2)}</p>
-                    <p className="tag">{payment.status}</p>
-                  </article>
-                ))
-              )}
-            </div>
-          </div>
-        </section>
-      )}
-
-      {activeTab === "logs" && (
-        <section className="panel audit-panel">
-          <div className="panel-header">
-            <div>
-              <h2>Audit Logs</h2>
-              <p>Track service activity and events across the platform.</p>
-            </div>
-            <button className="secondary-button" onClick={loadLogs} type="button">
-              Refresh
-            </button>
-          </div>
-
-          {logs.length === 0 ? (
-            <div className="empty-state">No audit logs available</div>
-          ) : (
-            <div className="table-wrapper">
-              <table className="audit-table">
-
-<thead>
-
-<tr>
-<th>ID</th>
-<th>Service</th>
-<th>Action</th>
-<th>Entity</th>
-<th>User</th>
-<th>Description</th>
-<th>Time</th>
-</tr>
-
-</thead>
-
-
-<tbody>
-
-
-{
-logs.map((log)=>(
-
-<tr key={log.id}>
-
-<td>{log.id}</td>
-
-
-<td>
-{log.serviceName}
-</td>
-
-
-<td>
-<span className="tag">
-{log.action}
-</span>
-</td>
-
-
-<td>
-{log.entityName}
-<br/>
-#{log.entityId}
-</td>
-
-
-<td>
-{log.username}
-</td>
-
-
-<td>
-{log.description}
-</td>
-
-
-<td>
-{formatTimestamp(log.timestamp)}
-</td>
-
-
-</tr>
-
-
-))
-}
-
-
-</tbody>
-
-              </table>
-            </div>
-          )}
-        </section>
-      )}
     </div>
   );
 }

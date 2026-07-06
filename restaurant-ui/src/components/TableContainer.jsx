@@ -63,16 +63,16 @@ export function TableContainer({ title, columns, data, searchFields, onDelete, i
   };
 
   return (
-    <div className="table-container">
-      <div className="table-header">
+    <div className="content-wrapper">
+      <div className="panel-header">
         <h3>{title}</h3>
         <SearchBar value={searchTerm} onChange={handleSearch} placeholder={`Search ${title.toLowerCase()}...`} />
       </div>
 
       {isLoading ? (
-        <div className="table-loading">Loading...</div>
+        <div className="empty-state">Loading…</div>
       ) : paginatedData.length === 0 ? (
-        <div className="table-empty">
+        <div className="empty-state">
           <p>No {title.toLowerCase()} found</p>
         </div>
       ) : (
@@ -96,8 +96,8 @@ export function TableContainer({ title, columns, data, searchFields, onDelete, i
               </tr>
             </thead>
             <tbody>
-              {paginatedData.map((item, idx) => (
-                <tr key={item.id} className={idx % 2 === 0 ? "even" : "odd"}>
+              {paginatedData.map((item) => (
+                <tr key={item.id}>
                   {columns.map((col) => (
                     <td key={col.key} className={col.className || ""}>
                       {col.render ? col.render(item[col.key], item) : formatValue(item[col.key])}
@@ -106,7 +106,8 @@ export function TableContainer({ title, columns, data, searchFields, onDelete, i
                   {onDelete && (
                     <td className="action-cell">
                       <button
-                        className="btn-delete"
+                        type="button"
+                        className="secondary-button danger-button small"
                         onClick={() => onDelete(item.id)}
                         title="Delete"
                       >
@@ -124,6 +125,7 @@ export function TableContainer({ title, columns, data, searchFields, onDelete, i
       {totalPages > 1 && (
         <div className="pagination">
           <button
+            type="button"
             disabled={currentPage === 0}
             onClick={() => setCurrentPage(currentPage - 1)}
             className="pagination-btn"
@@ -134,6 +136,7 @@ export function TableContainer({ title, columns, data, searchFields, onDelete, i
             Page {currentPage + 1} of {totalPages}
           </span>
           <button
+            type="button"
             disabled={currentPage >= totalPages - 1}
             onClick={() => setCurrentPage(currentPage + 1)}
             className="pagination-btn"

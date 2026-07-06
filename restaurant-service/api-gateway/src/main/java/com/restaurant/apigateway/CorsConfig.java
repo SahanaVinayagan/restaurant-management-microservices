@@ -1,4 +1,4 @@
-package com.restaurant.apigateway.config;
+package com.restaurant.apigateway;
 
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;

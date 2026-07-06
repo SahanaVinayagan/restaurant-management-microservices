@@ -149,12 +149,19 @@ function App() {
   const reversedPayments = [...payments].reverse();
   const reversedLogs = [...logs].reverse();
 
+  const tabs = [
+    { id: "restaurants", label: "Restaurants" },
+    { id: "orders", label: "Orders" },
+    { id: "payments", label: "Payments" },
+    { id: "logs", label: "Audit Logs" },
+  ];
+
   return (
-    <div className="app">
+    <>
       <header className="app-header">
         <div className="header-content">
           <h1 className="app-title">TableTrack</h1>
-          <p className="app-subtitle">Restaurant Management Dashboard</p>
+          <p className="header-subtitle">Restaurant Management Dashboard</p>
         </div>
         <button
           type="button"
@@ -162,7 +169,7 @@ function App() {
           onClick={() => setTheme((current) => (current === "light" ? "dark" : "light"))}
           title="Toggle theme"
         >
-          {theme === "light" ? "Dark" : "Light"}
+          {theme === "light" ? "🌙 Dark" : "☀️ Light"}
         </button>
       </header>
 
@@ -171,19 +178,22 @@ function App() {
 
         {error && (
           <div className="notification error">
-            <strong>Error</strong>
-            <p>{error}</p>
-            <button className="notification-close" onClick={() => setError("")}>×</button>
+            <strong>Something went wrong</strong>
+            <p style={{ margin: 0, display: "flex", justifyContent: "space-between", alignItems: "center", gap: 12 }}>
+              <span>{error}</span>
+              <button
+                type="button"
+                className="secondary-button danger-button small"
+                onClick={() => setError("")}
+              >
+                Dismiss
+              </button>
+            </p>
           </div>
         )}
 
         <nav className="tabs">
-          {[
-            { id: "restaurants", label: "Restaurants" },
-            { id: "orders", label: "Orders" },
-            { id: "payments", label: "Payments" },
-            { id: "logs", label: "Audit Logs" },
-          ].map((tab) => (
+          {tabs.map((tab) => (
             <button
               key={tab.id}
               className={`tab ${activeTab === tab.id ? "active" : ""}`}
@@ -197,8 +207,8 @@ function App() {
 
         {/* Restaurants Section */}
         {activeTab === "restaurants" && (
-          <div className="section">
-            <div className="section-layout">
+          <div className="panel">
+            <div className="panel-grid">
               <FormCard
                 title="Add New Restaurant"
                 onSubmit={submitRestaurant}
@@ -210,11 +220,11 @@ function App() {
                 isLoading={loading}
               />
 
-              <div className="section-content">
-                <div className="content-header">
+              <div className="audit-panel">
+                <div className="panel-header">
                   <h2>Restaurants</h2>
-                  <button className="btn-refresh" onClick={loadAllData} title="Refresh">
-                    Refresh
+                  <button type="button" className="secondary-button" onClick={loadAllData} title="Refresh">
+                    ↻ Refresh
                   </button>
                 </div>
 
@@ -238,8 +248,8 @@ function App() {
 
         {/* Orders Section */}
         {activeTab === "orders" && (
-          <div className="section">
-            <div className="section-layout">
+          <div className="panel">
+            <div className="panel-grid">
               <FormCard
                 title="Add New Order"
                 onSubmit={submitOrder}
@@ -257,11 +267,11 @@ function App() {
                 isLoading={loading}
               />
 
-              <div className="section-content">
-                <div className="content-header">
+              <div className="audit-panel">
+                <div className="panel-header">
                   <h2>Orders</h2>
-                  <button className="btn-refresh" onClick={loadAllData} title="Refresh">
-                    Refresh
+                  <button type="button" className="secondary-button" onClick={loadAllData} title="Refresh">
+                    ↻ Refresh
                   </button>
                 </div>
 
@@ -289,8 +299,8 @@ function App() {
 
         {/* Payments Section */}
         {activeTab === "payments" && (
-          <div className="section">
-            <div className="section-layout">
+          <div className="panel">
+            <div className="panel-grid">
               <FormCard
                 title="Add Payment"
                 onSubmit={submitPayment}
@@ -319,11 +329,11 @@ function App() {
                 isLoading={loading}
               />
 
-              <div className="section-content">
-                <div className="content-header">
+              <div className="audit-panel">
+                <div className="panel-header">
                   <h2>Payments</h2>
-                  <button className="btn-refresh" onClick={loadAllData} title="Refresh">
-                    Refresh
+                  <button type="button" className="secondary-button" onClick={loadAllData} title="Refresh">
+                    ↻ Refresh
                   </button>
                 </div>
 
@@ -341,7 +351,7 @@ function App() {
                       key: "status",
                       label: "Status",
                       render: (val) => (
-                        <span className={`badge status-${String(val).toLowerCase()}`}>{val}</span>
+                        <span className={`status-tag status-${String(val).toLowerCase()}`}>{val}</span>
                       ),
                     },
                   ]}
@@ -356,12 +366,12 @@ function App() {
 
         {/* Audit Logs Section */}
         {activeTab === "logs" && (
-          <div className="section">
-            <div className="section-content full-width">
-              <div className="content-header">
+          <div className="panel">
+            <div className="audit-panel">
+              <div className="panel-header">
                 <h2>Audit Logs</h2>
-                <button className="btn-refresh" onClick={loadAllData} title="Refresh">
-                  Refresh
+                <button type="button" className="secondary-button" onClick={loadAllData} title="Refresh">
+                  ↻ Refresh
                 </button>
               </div>
 
@@ -373,7 +383,7 @@ function App() {
                   {
                     key: "action",
                     label: "Action",
-                    render: (val) => <span className={`badge ${getActionColor(val)}`}>{val}</span>,
+                    render: (val) => <span className={`tag ${getActionColor(val)}`}>{val}</span>,
                   },
                   { key: "entityName", label: "Entity" },
                   { key: "username", label: "User" },
@@ -392,7 +402,7 @@ function App() {
           </div>
         )}
       </div>
-    </div>
+    </>
   );
 }
 

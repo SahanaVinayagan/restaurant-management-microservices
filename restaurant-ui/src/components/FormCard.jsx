@@ -60,8 +60,8 @@ export function FormCard({ title, onSubmit, fields, isLoading }) {
           </div>
         ))}
       </div>
-      <button type="submit" className="btn-primary" disabled={isLoading}>
-        {isLoading ? "Loading..." : "Submit"}
+      <button type="submit" disabled={isLoading}>
+        {isLoading ? "Submitting…" : "Submit"}
       </button>
     </form>
   );
